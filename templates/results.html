@@ -1,4 +1,24 @@
 {% extends "layout.html" %}
 {% block body %}
-   <p>{{ answer }}</p>
+   <p>Your input was interpreted as:</p>
+   {% for option in options %}
+      {% if interpretations[option] != false %}
+         {% if interpretations[option] == true %}
+            {{ option }} : 
+         {% else %}
+            {% if option == "in city" %}
+               at 
+            {% elif option == "to team" %}
+               vs 
+            {% endif %}
+            {{ teams[interpretations[option]] }} : 
+         {% endif %}
+      {% endif %}
+   {% endfor %}
+   <p>Answer:</p>
+   <p>{{ answer["weekday"] }}, {{ answer["game_date"] }} Attendance:
+   {{ answer["attendance"] }}<br />
+   {{ teams[answer["home_team"]] }} {{ answer["home_score"] }} @ 
+   {{ teams[answer["away_team"]] }} {{ answer["away_score"] }}
+   {{ answer["game_status"] }}
 {% endblock %}

@@ -5,7 +5,7 @@ from datetime import datetime, date
 from flask import Flask, request, session, g, redirect, url_for, \
       abort, render_template, flash
 from contextlib import closing
-from string import replace, split
+from string import replace, split, find
 from urllib2 import urlopen
 from bs4 import BeautifulSoup # $ pip install beautifulsoup4
 
@@ -44,6 +44,15 @@ def clear_game_data():
       app.preprocess_request()
       g.db.execute("delete from games")
       g.db.commit()
+
+def get_teams_array():
+   with app.test_request_context():
+      app.preprocess_request()
+      cur = g.db.execute('select id, city from teams')
+      teams = {}
+      for row in cur.fetchall():
+         teams[row[0]] = row[1]
+   return teams
 
 def scrape_seasons():
    #TODO: prevent double insert of games
@@ -131,10 +140,7 @@ def show_season(season_end_year):
          home_team=row[2], away_team=row[3], home_score=row[4],
          away_score=row[5], ot_or_so=row[6], attendance=row[7])
          for row in cur.fetchall()]
-   cur = g.db.execute('select id, city from teams')
-   teams = {}
-   for row in cur.fetchall():
-      teams[row[0]] = row[1]
+   teams=get_teams()
    return render_template('show_season.html', games=games, teams=teams)
 
 
@@ -155,8 +161,71 @@ def add_entry():
 
 @app.route('/query/<query_string>')
 def query(query_string):
-   answer = "Hello, world!"
-   return render_template('results.html', answer=answer)
+   options = ["most recent", "team", "victory", "defeat", "to team", "in city"]
+   constraints = []
+   interpretations = dict(zip(options, len(options) * [False]))
+   query_string = query_string.lower()
+
+   #TODO: be wary of usage of last (could mean opposite of first?)
+   if (find(query_string, "last") > -1 or
+      find(query_string, "most recent") > -1):
+         interpretations["most recent"] = True
+
+   teams = query_db('select * from teams')
+   for team in teams:
+      if (find(query_string, "in " + team["city"].lower()) > -1 or
+         find(query_string, "at " + team["city"].lower()) > -1):
+            interpretations["in city"] = team["id"]
+            query_string = replace(query_string, "at " + team["city"].lower(), "")
+            query_string = replace(query_string, "in " + team["city"].lower(), "")
+            constraints.append("away_team = " + str(team["id"]))
+
+      if find(query_string, "to " + team["city"].lower()) > -1:
+         interpretations["to team"] = team["id"]
+         query_string = replace(query_string, "to " + team["city"].lower(), "")
+         constraints.append("home_team = " + str(team["id"]) +
+                            " OR away_team = " + str(team["id"]))
+
+      if find(query_string, team["city"].lower()) > -1:
+         interpretations["team"] = team["id"]
+         constraints.append("home_team = " + str(team["id"]) +
+                            " OR away_team = " + str(team["id"]))
+   #endfor
+
+   if (find(query_string, "win") > -1 or
+      find(query_string, "victory") > -1):
+         interpretations["victory"] = True
+         if interpretations["team"] != False:
+            t = str(interpretations["team"])
+            constraints.append("(home_team=" + t + " AND home_score > away_score) OR " \
+               "(away_team=" + t + " AND away_score > home_score)");
+         # TODO: add other cases (e.g. "last win in Boston")
+
+   if (find(query_string, "loss") > -1 or
+      find(query_string, "lose") > -1 or 
+      find(query_string, "defeat") > -1):
+         interpretations["defeat"] = True
+         if interpretations["team"] != False:
+            t = str(interpretations["team"])
+            constraints.append("(home_team=" + t + " AND home_score < away_score) OR " \
+               "(away_team=" + t + " AND away_score < home_score)");
+         # TODO: add other cases (e.g. "last win in Boston")
+
+
+   ### FIND ANSWER
+   where_clause = ""
+   for c in constraints:
+      if len(where_clause) == 0:
+         where_clause = "(" + c + ")"
+      else:
+         where_clause += " AND (" + c + ")"
+   print('SELECT * FROM games WHERE ' + where_clause)
+   answer = query_db('SELECT * FROM games WHERE ' + where_clause, one=True)
+   answer["game_date"] = date.fromtimestamp(answer["game_date"])
+
+   return render_template('results.html', options=options,
+            interpretations=interpretations, teams=get_teams_array(),
+            answer=answer)
 
 if __name__ == '__main__':
    app.run()
