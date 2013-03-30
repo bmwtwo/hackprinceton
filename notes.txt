@@ -1,5 +1,13 @@
+- focus on design?
+   - AJAX, snappy responses - bring this up in demo (with num rows?)
+- Mongo ?
+
 - road victories
+- divisions
+- day of week (nice and obscure)
+   - weather
+- count functionality
+- before / after a certain date
 - "NOT" functionality
 - playoff data
 - who are you worst against?
-- days of the week

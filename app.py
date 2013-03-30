@@ -45,6 +45,14 @@ def clear_game_data():
       g.db.execute("delete from games")
       g.db.commit()
 
+def change_ids():
+   with app.test_request_context():
+      app.preprocess_request()
+      g.db.execute("UPDATE games SET home_team=9999 WHERE home_team=1")
+      g.db.execute("UPDATE games SET away_team=9999 WHERE away_team=1")
+      g.db.execute("UPDATE teams SET id=9999 WHERE id=1")
+      g.db.commit()
+
 def get_teams_array():
    with app.test_request_context():
       app.preprocess_request()
@@ -140,7 +148,7 @@ def show_season(season_end_year):
          home_team=row[2], away_team=row[3], home_score=row[4],
          away_score=row[5], ot_or_so=row[6], attendance=row[7])
          for row in cur.fetchall()]
-   teams=get_teams()
+   teams=get_teams_array()
    return render_template('show_season.html', games=games, teams=teams)
 
 
@@ -159,12 +167,12 @@ def add_entry():
    #return redirect(url_for('show_entries'))
    return 'New entries were successfully posted'
 
-@app.route('/query/<query_string>')
-def query(query_string):
+@app.route('/query/<user_input>')
+def query(user_input):
    options = ["most recent", "team", "victory", "defeat", "to team", "in city"]
    constraints = []
    interpretations = dict(zip(options, len(options) * [False]))
-   query_string = query_string.lower()
+   query_string = user_input.lower()
 
    #TODO: be wary of usage of last (could mean opposite of first?)
    if (find(query_string, "last") > -1 or
@@ -220,12 +228,16 @@ def query(query_string):
       else:
          where_clause += " AND (" + c + ")"
    print('SELECT * FROM games WHERE ' + where_clause)
-   answer = query_db('SELECT * FROM games WHERE ' + where_clause, one=True)
+   answer = query_db('SELECT * FROM games WHERE ' + where_clause + ' ORDER BY ' \
+                     'game_date DESC', one=True)
    answer["game_date"] = date.fromtimestamp(answer["game_date"])
+
+   #print (get_teams_array())
+   print (interpretations)
 
    return render_template('results.html', options=options,
             interpretations=interpretations, teams=get_teams_array(),
-            answer=answer)
+            answer=answer, user_input=user_input)
 
 if __name__ == '__main__':
    app.run()

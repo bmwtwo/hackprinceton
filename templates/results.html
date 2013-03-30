@@ -1,20 +1,24 @@
 {% extends "layout.html" %}
 {% block body %}
    <p>Your input was interpreted as:</p>
-   {% for option in options %}
-      {% if interpretations[option] != false %}
-         {% if interpretations[option] == true %}
-            {{ option }} : 
-         {% else %}
-            {% if option == "in city" %}
-               at 
-            {% elif option == "to team" %}
-               vs 
+   <div class="btn-group">
+      {% for option in options %}
+         {% if interpretations[option] != false %}
+            <button class="btn">
+            {% if interpretations[option] == true %}
+               {{ option }} 
+            {% else %}
+               {% if option == "in city" %}
+                  at 
+               {% elif option == "to team" %}
+                  vs 
+               {% endif %}
+               {{ teams[interpretations[option]] }}
             {% endif %}
-            {{ teams[interpretations[option]] }} : 
+            </button>
          {% endif %}
-      {% endif %}
-   {% endfor %}
+      {% endfor %}
+   </div>
    <p>Answer:</p>
    <p>{{ answer["weekday"] }}, {{ answer["game_date"] }} Attendance:
    {{ answer["attendance"] }}<br />
