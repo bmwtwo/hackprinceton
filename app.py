@@ -230,14 +230,17 @@ def query(user_input):
    print('SELECT * FROM games WHERE ' + where_clause)
    answer = query_db('SELECT * FROM games WHERE ' + where_clause + ' ORDER BY ' \
                      'game_date DESC', one=True)
-   answer["game_date"] = date.fromtimestamp(answer["game_date"])
+   my_date = date.fromtimestamp(answer["game_date"])
+   answer["game_date"] = my_date.strftime("%A, %B ")#%d %Y")
+   answer["game_date"] += my_date.strftime("%d, ").lstrip('0')
+   answer["game_date"] += my_date.strftime("%Y")
 
    #print (get_teams_array())
-   print (interpretations)
+   #print (interpretations)
 
    return render_template('results.html', options=options,
             interpretations=interpretations, teams=get_teams_array(),
-            answer=answer, user_input=user_input)
+            answer=answer, user_input=replace(user_input, "%3F", "?"))
 
 if __name__ == '__main__':
    app.run()

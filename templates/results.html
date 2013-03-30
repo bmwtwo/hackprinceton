@@ -1,5 +1,24 @@
 {% extends "layout.html" %}
+{% block head %}
+   <script>
+      $(document).ready(function() {
+         $("#input").on("keyup", function(e) {
+            if (e.which == 13) {
+               window.location.replace(
+                  encodeURI(("http://localhost:5000/query/" + $("#input").val()).replace(
+                     "?", "%3F"
+                  ))
+               );
+            }
+         });
+      });
+   </script>
+{% endblock %}
 {% block body %}
+   <h1>Hockey Stats</h1>
+   <form class="form-search">
+      <input id="input" type="text" class="input-xxlarge search-query" value="{{ user_input }}" />
+   </form>
    <p>Your input was interpreted as:</p>
    <div class="btn-group">
       {% for option in options %}
@@ -19,10 +38,16 @@
          {% endif %}
       {% endfor %}
    </div>
-   <p>Answer:</p>
-   <p>{{ answer["weekday"] }}, {{ answer["game_date"] }} Attendance:
-   {{ answer["attendance"] }}<br />
-   {{ teams[answer["home_team"]] }} {{ answer["home_score"] }} @ 
-   {{ teams[answer["away_team"]] }} {{ answer["away_score"] }}
-   {{ answer["game_status"] }}
+   <p class="answer">Answer:
+      <b>{{ answer["game_date"] }}</b>
+   </p>
+   <div class="boxscore">
+      Attendance:
+      {{ answer["attendance"] }}<br />
+      {{ teams[answer["home_team"]] }} {{ answer["home_score"] }}
+      <br />
+      {{ teams[answer["away_team"]] }} {{ answer["away_score"] }}
+      {{ answer["game_status"] }}
+   </div>
+   <br style="clear:both" />
 {% endblock %}
