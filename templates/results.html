@@ -28,26 +28,33 @@
                {{ option }} 
             {% else %}
                {% if option == "in city" %}
-                  at 
+                  at {{ teams[interpretations[option]] }}
                {% elif option == "to team" %}
-                  vs 
+                  vs {{ teams[interpretations[option]] }}
+               {% elif option == "team" %}
+                  {{ teams[interpretations[option]] }}
+               {% elif option == "on day" %}
+                  on a {{ interpretations[option] }}
                {% endif %}
-               {{ teams[interpretations[option]] }}
             {% endif %}
             </button>
          {% endif %}
       {% endfor %}
    </div>
    <p class="answer">Answer:
-      <b>{{ answer["game_date"] }}</b>
-   </p>
-   <div class="boxscore">
-      Attendance:
-      {{ answer["attendance"] }}<br />
-      {{ teams[answer["home_team"]] }} {{ answer["home_score"] }}
-      <br />
-      {{ teams[answer["away_team"]] }} {{ answer["away_score"] }}
-      {{ answer["game_status"] }}
-   </div>
+      {% if answer == None %}
+         <b>this has never happened</b></p>
+      {% else %}
+         <b>{{ answer["game_date"] }}</b></p>
+         </p>
+         <div class="boxscore">
+            Attendance:
+            {{ answer["attendance"] }}<br />
+            {{ teams[answer["home_team"]] }} {{ answer["home_score"] }}
+            <br />
+            {{ teams[answer["away_team"]] }} {{ answer["away_score"] }}
+            {{ answer["game_status"] }}
+         </div>
+      {% endif %}
    <br style="clear:both" />
 {% endblock %}

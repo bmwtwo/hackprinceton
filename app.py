@@ -35,6 +35,7 @@ def query_db(query, args=(), one=False):
    with app.test_request_context():
       app.preprocess_request()
       cur = g.db.execute(query, args)
+      #print(cur)
       rv = [dict((cur.description[idx][0], value)
                  for idx, value in enumerate(row)) for row in cur.fetchall()]
    return (rv[0] if rv else None) if one else rv
@@ -52,6 +53,19 @@ def change_ids():
       g.db.execute("UPDATE games SET away_team=9999 WHERE away_team=1")
       g.db.execute("UPDATE teams SET id=9999 WHERE id=1")
       g.db.commit()
+
+def update_weekdays():
+   with app.test_request_context():
+      app.preprocess_request()
+      g.db.execute("UPDATE games SET weekday='Sunday' WHERE weekday='Sun.'")
+      g.db.execute("UPDATE games SET weekday='Monday' WHERE weekday='Mon.'")
+      g.db.execute("UPDATE games SET weekday='Tuesday' WHERE weekday='Tue.'")
+      g.db.execute("UPDATE games SET weekday='Wednesday' WHERE weekday='Wed.'")
+      g.db.execute("UPDATE games SET weekday='Thursday' WHERE weekday='Thu.'")
+      g.db.execute("UPDATE games SET weekday='Friday' WHERE weekday='Fri.'")
+      g.db.execute("UPDATE games SET weekday='Saturday' WHERE weekday='Sat.'")
+      g.db.commit()
+   
 
 def get_teams_array():
    with app.test_request_context():
@@ -169,7 +183,7 @@ def add_entry():
 
 @app.route('/query/<user_input>')
 def query(user_input):
-   options = ["most recent", "team", "victory", "defeat", "to team", "in city"]
+   options = ["most recent", "team", "victory", "defeat", "to team", "in city", "on day"]
    constraints = []
    interpretations = dict(zip(options, len(options) * [False]))
    query_string = user_input.lower()
@@ -219,24 +233,33 @@ def query(user_input):
                "(away_team=" + t + " AND away_score < home_score)");
          # TODO: add other cases (e.g. "last win in Boston")
 
+   if (find(query_string, "on a ") > -1):
+      start = find(user_input, "on a ") + 5
+      end   = find(user_input, " ", start)
+      interpretations["on day"] = user_input[start:end-2]
+      day = interpretations["on day"]
+      constraints.append("weekday='" + day + "'")
 
-   ### FIND ANSWER
+
+   ##y FIND ANSWER
    where_clause = ""
    for c in constraints:
       if len(where_clause) == 0:
          where_clause = "(" + c + ")"
       else:
          where_clause += " AND (" + c + ")"
-   print('SELECT * FROM games WHERE ' + where_clause)
+   #print('SELECT * FROM games WHERE ' + where_clause)
    answer = query_db('SELECT * FROM games WHERE ' + where_clause + ' ORDER BY ' \
                      'game_date DESC', one=True)
-   my_date = date.fromtimestamp(answer["game_date"])
-   answer["game_date"] = my_date.strftime("%A, %B ")#%d %Y")
-   answer["game_date"] += my_date.strftime("%d, ").lstrip('0')
-   answer["game_date"] += my_date.strftime("%Y")
+   if answer != None:
+      my_date = date.fromtimestamp(answer["game_date"])
+      answer["game_date"] = my_date.strftime("%A, %B ")#%d %Y")
+      answer["game_date"] += my_date.strftime("%d, ").lstrip('0')
+      answer["game_date"] += my_date.strftime("%Y")
 
    #print (get_teams_array())
    #print (interpretations)
+   #print(answer["weekday"])
 
    return render_template('results.html', options=options,
             interpretations=interpretations, teams=get_teams_array(),
