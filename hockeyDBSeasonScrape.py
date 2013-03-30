@@ -5,7 +5,7 @@ except ImportError:
 
 from bs4 import BeautifulSoup # $ pip install beautifulsoup4
 
-url = "http://www.hockeydb.com/ihdb/stats/team_results.php?tid=39&sid=2011"
+url = "http://www.hockeydb.com/ihdb/stats/league_results.php?lid=nhl1927&sid=2012"
 soup = BeautifulSoup(urlopen(url), "html5lib")
 
 tables = soup.find_all("table")

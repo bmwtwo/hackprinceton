@@ -1,5 +1,7 @@
 # all the imports
 import sqlite3
+import time
+from datetime import datetime, date
 from flask import Flask, request, session, g, redirect, url_for, \
       abort, render_template, flash
 from contextlib import closing
@@ -45,73 +47,68 @@ def clear_game_data():
 
 def scrape_seasons():
    #TODO: prevent double insert of games
-   url = "http://www.hockeydb.com/ihdb/stats/team_results.php?tid=39&sid=2011"
-   soup = BeautifulSoup(urlopen(url), "html5lib")
-   tables = soup.find_all("table")
+   for year in (range(2012, 2005, -1) + range(2004, 1967, -1)):
+      url = "http://www.hockeydb.com/ihdb/stats/league_results.php?lid=nhl1927&sid=" + str(year)
+      soup = BeautifulSoup(urlopen(url), "html5lib")
+      tables = soup.find_all("table")
 
-   for t in tables:
-      rows = t.tbody.find_all("tr")
-      for r in rows:
-         data = [item.text for item in r.find_all("td")]
+      for t in tables:
+         rows = t.tbody.find_all("tr")
+         for r in rows:
+            data = [item.text for item in r.find_all("td")]
 
-         other_team_id = query_db('select id from teams where city = ?', [data[2]],
-               one=True)
-         if other_team_id is None:
-            # insert new team
-            with app.test_request_context():
-               app.preprocess_request()
-               g.db.execute('insert into teams (city) values (?)', [data[2]])
-               g.db.commit()
-            other_team_id = query_db('select id from teams where city = ?', [data[2]],
-               one=True)
-         other_team_id = other_team_id['id']
+            home_team_id = query_db('select id from teams where city = ?', [data[2]], one=True)
+            if home_team_id is None:
+               # insert new team
+               with app.test_request_context():
+                  app.preprocess_request()
+                  g.db.execute('insert into teams (city) values (?)', [data[2]])
+                  g.db.commit()
+               home_team_id = query_db('select id from teams where city = ?', [data[2]], one=True)
+            home_team_id = home_team_id['id']
 
-         #TODO: fix this hard-coding
-         team = "Vancouver"
-         team_id = query_db('select id from teams where city = ?', [team], one=True)
-         if team_id is None:
-            # insert new team
-            with app.test_request_context():
-               app.preprocess_request()
-               g.db.execute('insert into teams (city) values (?)', [team])
-               g.db.commit()
-            team_id = query_db('select id from teams where city = ?', [team], one=True)
-         team_id = team_id['id']
+            away_team_id = query_db('select id from teams where city = ?', [data[4]],
+                  one=True)
+            if away_team_id is None:
+               # insert new team
+               with app.test_request_context():
+                  app.preprocess_request()
+                  g.db.execute('insert into teams (city) values (?)', [data[4]])
+                  g.db.commit()
+               away_team_id = query_db('select id from teams where city = ?', [data[4]],
+                  one=True)
+            away_team_id = away_team_id['id']
 
-         date_tuple = split(data[0], "/")
-         date = date_tuple[2] + "-" + date_tuple[0] + "-" + date_tuple[1]
-         #TODO
-         weekday = 'TODO'
+            date_tuple = split(data[0], "/")
+            date = time.mktime(datetime(int(date_tuple[2]), int(date_tuple[0]),
+                   int(date_tuple[1])).timetuple())
+            weekday = data[1]
 
-         if data[1] == "at":
-            away_team = team_id
-            home_team = other_team_id
-            home_score = int(data[4])
-            away_score = int(data[3])
-         else:
-            home_team = team_id
-            away_team = other_team_id
             home_score = int(data[3])
-            away_score = int(data[4])
+            away_score = int(data[5])
 
-         if data[6] == "SO":
-            ot_or_so = 2
-         elif data[6] == "OT":
-            ot_or_so = 1
-         else:
-            ot_or_so = 0
+            if data[6] == "SO":
+               ot_or_so = 2
+            elif data[6] == "OT":
+               ot_or_so = 1
+            else:
+               ot_or_so = 0
 
-         attendance = int( replace(data[7], ",", "") )
+            att_string = replace(data[7], ",", "")
+            if att_string == "":
+               attendance = 0
+            else:
+               attendance = int(att_string)
 
-         with app.test_request_context():
-            app.preprocess_request()
-            g.db.execute('insert into games (game_date, weekday, home_team, ' \
-                      'away_team, home_score, away_score, ot_or_so, ' \
-                      'attendance) values (?, ?, ?, ?, ?, ?, ?, ?)',
-                      [date, weekday, home_team, away_team, home_score,
-                       away_score, ot_or_so, attendance])
-            g.db.commit()
-   print("finished scraping season ending on " + date)
+            with app.test_request_context():
+               app.preprocess_request()
+               g.db.execute('insert into games (game_date, weekday, home_team, ' \
+                         'away_team, home_score, away_score, ot_or_so, ' \
+                         'attendance) values (?, ?, ?, ?, ?, ?, ?, ?)',
+                         [date, weekday, home_team_id, away_team_id, home_score,
+                          away_score, ot_or_so, attendance])
+               g.db.commit()
+      print("finished scraping " + str(year-1) + "-" + str(year) + " season")
 
 @app.before_request
 def before_request():
@@ -121,15 +118,24 @@ def before_request():
 def teardown_request(exception):
    g.db.close()
 
-@app.route('/')
-def show_entries():
-   cur = g.db.execute('select game_date, home_team, away_team from games order by game_date desc')
-   games = [dict(date=row[0], home_team=row[1], away_team=row[2]) for row in cur.fetchall()]
+@app.route('/season/<season_end_year>')
+def show_season(season_end_year):
+   season_end_year = int(season_end_year)
+   lo = time.mktime(datetime(season_end_year - 1, 8, 31).timetuple())
+   hi = time.mktime(datetime(season_end_year, 7, 1).timetuple())
+   cur = g.db.execute('select game_date, weekday, home_team, ' \
+         'away_team, home_score, away_score, ot_or_so, attendance from games ' \
+         'where game_date > ? and game_date < ? order by game_date desc',
+         [lo, hi])
+   games = [dict(date=date.fromtimestamp(row[0]), weekday=row[1],
+         home_team=row[2], away_team=row[3], home_score=row[4],
+         away_score=row[5], ot_or_so=row[6], attendance=row[7])
+         for row in cur.fetchall()]
    cur = g.db.execute('select id, city from teams')
    teams = {}
    for row in cur.fetchall():
       teams[row[0]] = row[1]
-   return render_template('show_entries.html', games=games, teams=teams)
+   return render_template('show_season.html', games=games, teams=teams)
 
 
 @app.route('/add', methods=['POST'])
@@ -146,6 +152,11 @@ def add_entry():
    #flash('New entry was successfully posted')
    #return redirect(url_for('show_entries'))
    return 'New entries were successfully posted'
+
+@app.route('/query/<query_string>')
+def query(query_string):
+   answer = "Hello, world!"
+   return render_template('results.html', answer=answer)
 
 if __name__ == '__main__':
    app.run()

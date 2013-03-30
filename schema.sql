@@ -1,6 +1,6 @@
 create table if not exists games (
    id integer primary key autoincrement,
-   game_date date not null,
+   game_date integer not null,
    weekday string not null,
    home_team integer not null, -- consider foreign key
    away_team integer not null,
